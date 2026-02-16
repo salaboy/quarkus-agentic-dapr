@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: io.quarkiverse.dapr.langchain4j.workflow.DaprPlannerRegistryTest
--------------------------------------------------------------------------------
-Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.569 s -- in io.quarkiverse.dapr.langchain4j.workflow.DaprPlannerRegistryTest
