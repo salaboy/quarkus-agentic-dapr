@@ -1,0 +1,6 @@
+/Users/salaboy/code/salaboy/quarkus-agentic-dapr/runtime/src/test/java/io/quarkiverse/dapr/langchain4j/workflow/DaprAgentServiceUtilTest.java
+/Users/salaboy/code/salaboy/quarkus-agentic-dapr/runtime/src/test/java/io/quarkiverse/dapr/langchain4j/workflow/DaprPlannerRegistryTest.java
+/Users/salaboy/code/salaboy/quarkus-agentic-dapr/runtime/src/test/java/io/quarkiverse/dapr/langchain4j/workflow/DaprWorkflowPlannerTest.java
+/Users/salaboy/code/salaboy/quarkus-agentic-dapr/runtime/src/test/java/io/quarkiverse/dapr/langchain4j/workflow/orchestration/ActivitiesTest.java
+/Users/salaboy/code/salaboy/quarkus-agentic-dapr/runtime/src/test/java/io/quarkiverse/dapr/langchain4j/workflow/orchestration/InputRecordsTest.java
+/Users/salaboy/code/salaboy/quarkus-agentic-dapr/runtime/src/test/java/io/quarkiverse/dapr/langchain4j/workflow/orchestration/OrchestrationInputTest.java

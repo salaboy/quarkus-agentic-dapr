@@ -1,0 +1,4 @@
+io/quarkiverse/dapr/examples/MockChatModel.class
+io/quarkiverse/dapr/examples/DockerAvailableCondition.class
+io/quarkiverse/dapr/examples/DaprWorkflowClientTest.class
+io/quarkiverse/dapr/examples/StoryResourceTest.class

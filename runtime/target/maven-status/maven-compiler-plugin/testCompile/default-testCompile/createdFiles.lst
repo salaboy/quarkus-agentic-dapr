@@ -1,0 +1,6 @@
+io/quarkiverse/dapr/langchain4j/workflow/DaprPlannerRegistryTest.class
+io/quarkiverse/dapr/langchain4j/workflow/DaprAgentServiceUtilTest.class
+io/quarkiverse/dapr/langchain4j/workflow/DaprWorkflowPlannerTest.class
+io/quarkiverse/dapr/langchain4j/workflow/orchestration/ActivitiesTest.class
+io/quarkiverse/dapr/langchain4j/workflow/orchestration/OrchestrationInputTest.class
+io/quarkiverse/dapr/langchain4j/workflow/orchestration/InputRecordsTest.class
