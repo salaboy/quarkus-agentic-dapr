@@ -5,7 +5,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
 
 /**
- * CDI bean implementing {@link TestAgent} so that {@link CatalystAgentRegistry}
+ * CDI bean implementing {@link TestAgent} so that {@link AgentRegistry}
  * can discover it via {@code BeanManager} during startup.
  */
 @Alternative

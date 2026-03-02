@@ -15,6 +15,6 @@ public interface StyleEditor {
             Return only the improved story and nothing else.
             Story: {{story}}
             """)
-    @Agent(description = "Edit a story to improve its writing style", outputKey = "story")
+    @Agent(name="style-editor-agent", description = "Edit a story to improve its writing style", outputKey = "story")
     String editStory(@V("story") String story, @V("style") String style);
 }

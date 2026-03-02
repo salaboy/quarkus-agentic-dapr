@@ -4,7 +4,7 @@ import dev.langchain4j.agentic.Agent;
 import dev.langchain4j.service.SystemMessage;
 
 /**
- * Test agent interface for verifying auto-discovery by {@link CatalystAgentRegistry}.
+ * Test agent interface for verifying auto-discovery by {@link AgentRegistry}.
  * Contains multiple {@code @Agent} methods covering different metadata combinations.
  * <p>
  * Methods have no parameters to avoid validation errors from the langchain4j

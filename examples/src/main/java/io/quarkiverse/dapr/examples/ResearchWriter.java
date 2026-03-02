@@ -29,7 +29,7 @@ public interface ResearchWriter {
             using the available tools to fetch accurate data.
             Return only the summary.
             """)
-    @Agent(name = "research location agent",
+    @Agent(name = "research-location-agent",
         description = "Researches and summarises facts about a country", outputKey = "summary")
     String research(@V("country") String country);
 }

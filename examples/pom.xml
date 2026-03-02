@@ -20,6 +20,12 @@
             <version>${project.version}</version>
         </dependency>
 
+        <dependency>
+          <groupId>io.quarkiverse.dapr</groupId>
+          <artifactId>quarkus-agentic-dapr-agents-registry</artifactId>
+          <version>${project.version}</version>
+        </dependency>
+
         <!-- LLM provider -->
         <dependency>
             <groupId>io.quarkiverse.langchain4j</groupId>

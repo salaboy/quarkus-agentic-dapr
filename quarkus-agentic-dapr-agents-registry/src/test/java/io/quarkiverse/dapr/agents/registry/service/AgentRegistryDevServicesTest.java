@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 /**
- * Integration tests for {@link CatalystAgentRegistry} using Dapr dev services.
+ * Integration tests for {@link AgentRegistry} using Dapr dev services.
  * <p>
  * Requires Docker for Dapr dev services (starts daprd, placement, scheduler,
  * PostgreSQL state store, and dashboard containers via Testcontainers).
@@ -22,14 +22,14 @@ import static org.awaitility.Awaitility.await;
  * interface methods for the registry to discover.
  */
 @QuarkusTest
-class CatalystAgentRegistryDevServicesTest {
+class AgentRegistryDevServicesTest {
 
     private static final String STATE_STORE = "kvstore";
     private static final String TEAM = "test-team";
     private static final String APP_ID = "test-catalyst-app";
 
     @Inject
-    CatalystAgentRegistry registry;
+    AgentRegistry registry;
 
     @Inject
     DaprClient daprClient;

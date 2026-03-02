@@ -12,7 +12,7 @@ import dev.langchain4j.service.V;
  */
 public interface StoryCreator {
 
-    @SequenceAgent(
+    @SequenceAgent(name= "story-creator-agent",
             outputKey = "story",
             subAgents = { CreativeWriter.class, StyleEditor.class })
     String write(@V("topic") String topic, @V("style") String style);
