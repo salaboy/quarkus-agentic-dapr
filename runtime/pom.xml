@@ -34,7 +34,7 @@
         <dependency>
           <groupId>dev.langchain4j</groupId>
           <artifactId>langchain4j-agentic-a2a</artifactId>
-          <version>1.11.0-beta19-a2a1</version>
+          <version>1.11.0-beta19-patched</version>
         </dependency>
         <dependency>
           <groupId>io.github.a2asdk</groupId>
