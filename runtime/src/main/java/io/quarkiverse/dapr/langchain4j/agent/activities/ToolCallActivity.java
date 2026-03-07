@@ -1,5 +1,6 @@
 package io.quarkiverse.dapr.langchain4j.agent.activities;
 
+import io.quarkiverse.dapr.workflows.ActivityMetadata;
 import org.jboss.logging.Logger;
 
 import io.dapr.workflows.WorkflowActivity;
@@ -27,6 +28,7 @@ import jakarta.enterprise.context.ApplicationScoped;
  * </ol>
  */
 @ApplicationScoped
+@ActivityMetadata(name = "tool-call")
 public class ToolCallActivity implements WorkflowActivity {
 
     private static final Logger LOG = Logger.getLogger(ToolCallActivity.class);

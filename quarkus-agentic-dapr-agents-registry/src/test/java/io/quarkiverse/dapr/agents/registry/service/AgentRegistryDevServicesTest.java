@@ -26,7 +26,7 @@ class AgentRegistryDevServicesTest {
 
     private static final String STATE_STORE = "kvstore";
     private static final String TEAM = "test-team";
-    private static final String APP_ID = "test-catalyst-app";
+    private static final String APP_ID = "local-dapr-app";
 
     @Inject
     AgentRegistry registry;

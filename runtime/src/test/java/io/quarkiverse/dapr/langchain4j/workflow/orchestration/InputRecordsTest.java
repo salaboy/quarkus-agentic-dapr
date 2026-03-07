@@ -8,16 +8,17 @@ class InputRecordsTest {
 
     @Test
     void agentExecInputShouldStoreFields() {
-        AgentExecInput input = new AgentExecInput("planner-abc", 2);
+        AgentExecInput input = new AgentExecInput("planner-abc", 2, "planner-abc:2");
 
         assertThat(input.plannerId()).isEqualTo("planner-abc");
         assertThat(input.agentIndex()).isEqualTo(2);
+        assertThat(input.agentRunId()).isEqualTo("planner-abc:2");
     }
 
     @Test
     void agentExecInputShouldSupportEquality() {
-        AgentExecInput a = new AgentExecInput("id", 1);
-        AgentExecInput b = new AgentExecInput("id", 1);
+        AgentExecInput a = new AgentExecInput("id", 1, "id:1");
+        AgentExecInput b = new AgentExecInput("id", 1, "id:1");
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -41,7 +42,7 @@ class InputRecordsTest {
 
     @Test
     void differentRecordTypesShouldNotBeEqual() {
-        AgentExecInput agent = new AgentExecInput("id", 1);
+        AgentExecInput agent = new AgentExecInput("id", 1, "id:1");
         ConditionCheckInput condition = new ConditionCheckInput("id", 1);
 
         // They're different record types, so they shouldn't be equal

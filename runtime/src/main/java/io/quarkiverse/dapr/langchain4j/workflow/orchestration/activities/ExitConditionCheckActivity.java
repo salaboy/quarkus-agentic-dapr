@@ -5,6 +5,7 @@ import io.dapr.workflows.WorkflowActivityContext;
 import io.quarkiverse.dapr.langchain4j.workflow.DaprPlannerRegistry;
 import io.quarkiverse.dapr.langchain4j.workflow.DaprWorkflowPlanner;
 import io.quarkiverse.dapr.langchain4j.workflow.orchestration.ExitConditionCheckInput;
+import io.quarkiverse.dapr.workflows.ActivityMetadata;
 import jakarta.enterprise.context.ApplicationScoped;
 
 /**
@@ -12,6 +13,7 @@ import jakarta.enterprise.context.ApplicationScoped;
  * Returns {@code true} if the loop should exit, {@code false} otherwise.
  */
 @ApplicationScoped
+@ActivityMetadata(name = "exit-condition-check")
 public class ExitConditionCheckActivity implements WorkflowActivity {
 
     @Override

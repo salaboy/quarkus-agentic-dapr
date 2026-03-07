@@ -7,10 +7,6 @@ import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 
 import org.junit.jupiter.api.AfterEach;
@@ -57,44 +53,27 @@ class ActivitiesTest {
         DaprPlannerRegistry.unregister(planner.getPlannerId());
     }
 
-    private AgentExecutionActivity createActivity() throws Exception {
-        DaprWorkflowClient mockWorkflowClient = mock(DaprWorkflowClient.class);
+    @Test
+    void agentExecutionActivityShouldSubmitAndReturnImmediately() {
         AgentExecutionActivity activity = new AgentExecutionActivity();
-        // Inject mock DaprWorkflowClient via reflection (simulating CDI injection in unit tests)
-        java.lang.reflect.Field field = AgentExecutionActivity.class.getDeclaredField("workflowClient");
-        field.setAccessible(true);
-        field.set(activity, mockWorkflowClient);
-        return activity;
-    }
-
-    @Test
-    void agentExecutionActivityShouldBlockUntilFutureCompleted() throws Exception {
-        AgentExecutionActivity activity = createActivity();
 
         WorkflowActivityContext ctx = mock(WorkflowActivityContext.class);
         when(ctx.getInput(AgentExecInput.class))
-                .thenReturn(new AgentExecInput(planner.getPlannerId(), 0));
+                .thenReturn(new AgentExecInput(planner.getPlannerId(), 0,
+                        planner.getPlannerId() + ":0"));
 
-        // Run the activity in a background thread (it blocks on future.join())
-        CompletableFuture<Object> result = CompletableFuture.supplyAsync(() -> activity.run(ctx));
-
-        // Give time for the activity to execute planner.executeAgent()
-        Thread.sleep(100);
-        assertThat(result.isDone()).isFalse();
-
-        // The correct approach in the real system is that internalNextAction drains
-        // the queue and eventually nextAction completes the future.
-        // For testing the activity in isolation, we just cancel the future.
-        result.cancel(true);
+        // Activity should return immediately (non-blocking)
+        Object result = activity.run(ctx);
+        assertThat(result).isNull();
     }
 
     @Test
-    void agentExecutionActivityShouldThrowForUnknownPlanner() throws Exception {
-        AgentExecutionActivity activity = createActivity();
+    void agentExecutionActivityShouldThrowForUnknownPlanner() {
+        AgentExecutionActivity activity = new AgentExecutionActivity();
 
         WorkflowActivityContext ctx = mock(WorkflowActivityContext.class);
         when(ctx.getInput(AgentExecInput.class))
-                .thenReturn(new AgentExecInput("nonexistent-planner", 0));
+                .thenReturn(new AgentExecInput("nonexistent-planner", 0, "nonexistent-planner:0"));
 
         assertThatThrownBy(() -> activity.run(ctx))
                 .isInstanceOf(IllegalStateException.class)

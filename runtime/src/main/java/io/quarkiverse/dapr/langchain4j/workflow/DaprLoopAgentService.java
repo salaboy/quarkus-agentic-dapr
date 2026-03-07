@@ -4,6 +4,8 @@ import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 
 import dev.langchain4j.agentic.UntypedAgent;
+import dev.langchain4j.agentic.declarative.LoopAgent;
+import dev.langchain4j.agentic.internal.AgentUtil;
 import dev.langchain4j.agentic.planner.AgenticSystemTopology;
 import dev.langchain4j.agentic.scope.AgenticScope;
 import dev.langchain4j.agentic.workflow.impl.LoopAgentServiceImpl;
@@ -23,8 +25,15 @@ public class DaprLoopAgentService<T> extends LoopAgentServiceImpl<T> implements 
     private boolean daprTestExitAtLoopEnd;
 
     public DaprLoopAgentService(Class<T> agentServiceClass, DaprWorkflowClient workflowClient) {
-        super(agentServiceClass, null);
+        super(agentServiceClass, resolveMethod(agentServiceClass));
         this.workflowClient = workflowClient;
+    }
+
+    private static <T> java.lang.reflect.Method resolveMethod(Class<T> agentServiceClass) {
+        if (agentServiceClass == UntypedAgent.class) {
+            return null;
+        }
+        return AgentUtil.validateAgentClass(agentServiceClass, false, LoopAgent.class);
     }
 
     @Override

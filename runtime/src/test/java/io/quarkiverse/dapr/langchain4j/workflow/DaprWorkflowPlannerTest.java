@@ -109,7 +109,7 @@ class DaprWorkflowPlannerTest {
         Action action = planner.firstAction(planCtx);
 
         verify(workflowClient).scheduleNewWorkflow(
-                eq(SequentialOrchestrationWorkflow.class),
+                eq("sequential-agent"),
                 any(),
                 eq(planner.getPlannerId()));
 

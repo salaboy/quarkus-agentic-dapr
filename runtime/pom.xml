@@ -32,6 +32,21 @@
             <artifactId>quarkus-arc</artifactId>
         </dependency>
         <dependency>
+          <groupId>dev.langchain4j</groupId>
+          <artifactId>langchain4j-agentic-a2a</artifactId>
+          <version>1.11.0-beta19-a2a1</version>
+        </dependency>
+        <dependency>
+          <groupId>io.github.a2asdk</groupId>
+          <artifactId>a2a-java-sdk-opentelemetry-client</artifactId>
+          <version>${a2a.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>io.github.a2asdk</groupId>
+          <artifactId>a2a-java-sdk-opentelemetry-client-propagation</artifactId>
+          <version>${a2a.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>

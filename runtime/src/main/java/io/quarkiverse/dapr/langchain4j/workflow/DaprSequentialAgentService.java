@@ -1,6 +1,8 @@
 package io.quarkiverse.dapr.langchain4j.workflow;
 
 import dev.langchain4j.agentic.UntypedAgent;
+import dev.langchain4j.agentic.declarative.SequenceAgent;
+import dev.langchain4j.agentic.internal.AgentUtil;
 import dev.langchain4j.agentic.planner.AgenticSystemTopology;
 import dev.langchain4j.agentic.workflow.SequentialAgentService;
 import dev.langchain4j.agentic.workflow.impl.SequentialAgentServiceImpl;
@@ -17,8 +19,15 @@ public class DaprSequentialAgentService<T> extends SequentialAgentServiceImpl<T>
     private final DaprWorkflowClient workflowClient;
 
     public DaprSequentialAgentService(Class<T> agentServiceClass, DaprWorkflowClient workflowClient) {
-        super(agentServiceClass, null);
+        super(agentServiceClass, resolveMethod(agentServiceClass));
         this.workflowClient = workflowClient;
+    }
+
+    private static <T> java.lang.reflect.Method resolveMethod(Class<T> agentServiceClass) {
+        if (agentServiceClass == UntypedAgent.class) {
+            return null;
+        }
+        return AgentUtil.validateAgentClass(agentServiceClass, false, SequenceAgent.class);
     }
 
     @Override

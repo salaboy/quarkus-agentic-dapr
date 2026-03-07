@@ -8,6 +8,7 @@ import io.dapr.workflows.client.DaprWorkflowClient;
 import io.quarkiverse.dapr.langchain4j.agent.workflow.AgentEvent;
 import io.quarkiverse.dapr.langchain4j.agent.workflow.AgentRunInput;
 import io.quarkiverse.dapr.langchain4j.agent.workflow.AgentRunWorkflow;
+import io.quarkiverse.dapr.langchain4j.workflow.WorkflowNameResolver;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
@@ -58,7 +59,8 @@ public class AgentRunLifecycleManager {
             String name = (agentName != null && !agentName.isBlank()) ? agentName : "standalone";
             AgentRunContext runContext = new AgentRunContext(agentRunId);
             DaprAgentRunRegistry.register(agentRunId, runContext);
-            workflowClient.scheduleNewWorkflow(AgentRunWorkflow.class,
+            workflowClient.scheduleNewWorkflow(
+                    WorkflowNameResolver.resolve(AgentRunWorkflow.class),
                     new AgentRunInput(agentRunId, name, userMessage, systemMessage), agentRunId);
             DaprAgentContextHolder.set(agentRunId);
             LOG.infof("[AgentRun:%s] AgentRunWorkflow started (lazy — standalone @Agent), agent=%s",

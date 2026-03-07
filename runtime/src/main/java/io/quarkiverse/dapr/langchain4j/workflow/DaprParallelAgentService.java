@@ -1,6 +1,8 @@
 package io.quarkiverse.dapr.langchain4j.workflow;
 
 import dev.langchain4j.agentic.UntypedAgent;
+import dev.langchain4j.agentic.declarative.ParallelAgent;
+import dev.langchain4j.agentic.internal.AgentUtil;
 import dev.langchain4j.agentic.planner.AgenticSystemTopology;
 import dev.langchain4j.agentic.workflow.ParallelAgentService;
 import dev.langchain4j.agentic.workflow.impl.ParallelAgentServiceImpl;
@@ -17,8 +19,15 @@ public class DaprParallelAgentService<T> extends ParallelAgentServiceImpl<T> imp
     private final DaprWorkflowClient workflowClient;
 
     public DaprParallelAgentService(Class<T> agentServiceClass, DaprWorkflowClient workflowClient) {
-        super(agentServiceClass, null);
+        super(agentServiceClass, resolveMethod(agentServiceClass));
         this.workflowClient = workflowClient;
+    }
+
+    private static <T> java.lang.reflect.Method resolveMethod(Class<T> agentServiceClass) {
+        if (agentServiceClass == UntypedAgent.class) {
+            return null;
+        }
+        return AgentUtil.validateAgentClass(agentServiceClass, false, ParallelAgent.class);
     }
 
     @Override

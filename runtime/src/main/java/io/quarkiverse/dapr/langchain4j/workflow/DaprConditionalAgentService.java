@@ -5,10 +5,12 @@ import java.util.Map;
 import java.util.function.Predicate;
 
 import dev.langchain4j.agentic.UntypedAgent;
+import dev.langchain4j.agentic.declarative.ConditionalAgent;
+import dev.langchain4j.agentic.internal.AgentExecutor;
+import dev.langchain4j.agentic.internal.AgentUtil;
 import dev.langchain4j.agentic.planner.AgenticSystemTopology;
 import dev.langchain4j.agentic.scope.AgenticScope;
 import dev.langchain4j.agentic.workflow.impl.ConditionalAgentServiceImpl;
-import dev.langchain4j.agentic.internal.AgentExecutor;
 import io.dapr.workflows.client.DaprWorkflowClient;
 import io.quarkiverse.dapr.langchain4j.workflow.orchestration.ConditionalOrchestrationWorkflow;
 
@@ -24,8 +26,15 @@ public class DaprConditionalAgentService<T> extends ConditionalAgentServiceImpl<
     private int agentCounter = 0;
 
     public DaprConditionalAgentService(Class<T> agentServiceClass, DaprWorkflowClient workflowClient) {
-        super(agentServiceClass, null);
+        super(agentServiceClass, resolveMethod(agentServiceClass));
         this.workflowClient = workflowClient;
+    }
+
+    private static <T> java.lang.reflect.Method resolveMethod(Class<T> agentServiceClass) {
+        if (agentServiceClass == UntypedAgent.class) {
+            return null;
+        }
+        return AgentUtil.validateAgentClass(agentServiceClass, false, ConditionalAgent.class);
     }
 
     @Override

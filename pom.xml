@@ -22,10 +22,11 @@
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <quarkus.version>3.31.2</quarkus.version>
-        <dapr-sdk.version>1.17.0-rc-4</dapr-sdk.version>
-<!--        <quarkus-dapr.version>2.5.0-rc.4</quarkus-dapr.version>-->
-        <quarkus-dapr.version>999-SNAPSHOT</quarkus-dapr.version>
+        <dapr-sdk.version>1.17.0</dapr-sdk.version>
+        <quarkus-dapr.version>2.5.0</quarkus-dapr.version>
         <quarkus-langchain4j.version>1.7.1</quarkus-langchain4j.version>
+        <a2a.version>1.0.0.Alpha4-SNAPSHOT</a2a.version>
+        <protobuf.version>4.33.1</protobuf.version>
     </properties>
 
     <dependencyManagement>
@@ -41,6 +42,23 @@
                 <groupId>io.dapr</groupId>
                 <artifactId>dapr-sdk-workflows</artifactId>
                 <version>${dapr-sdk.version}</version>
+            </dependency>
+            <dependency>
+              <groupId>io.github.a2asdk</groupId>
+              <artifactId>a2a-java-sdk-bom</artifactId>
+              <version>${a2a.version}</version>
+              <type>pom</type>
+              <scope>import</scope>
+            </dependency>
+            <dependency>
+              <groupId>com.google.protobuf</groupId>
+              <artifactId>protobuf-java</artifactId>
+              <version>${protobuf.version}</version>
+            </dependency>
+            <dependency>
+              <groupId>com.google.protobuf</groupId>
+              <artifactId>protobuf-java-util</artifactId>
+              <version>${protobuf.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

@@ -6,12 +6,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 
@@ -30,6 +29,8 @@ import dev.langchain4j.service.UserMessage;
 import io.dapr.workflows.Workflow;
 import io.dapr.workflows.client.DaprWorkflowClient;
 import io.quarkiverse.dapr.langchain4j.agent.DaprAgentContextHolder;
+import io.quarkiverse.dapr.langchain4j.agent.DaprAgentRunRegistry;
+import io.quarkiverse.dapr.langchain4j.agent.workflow.AgentEvent;
 import io.quarkiverse.dapr.langchain4j.workflow.orchestration.OrchestrationInput;
 
 /**
@@ -62,6 +63,13 @@ public class DaprWorkflowPlanner implements Planner {
     public record AgentExchange(AgentInstance agent, CompletableFuture<Void> continuation, String agentRunId) {
     }
 
+    /**
+     * Tracks per-agent completion info so {@link #nextAction} can signal the
+     * orchestration workflow and clean up after each agent finishes.
+     */
+    private record PendingAgentInfo(String agentRunId) {
+    }
+
     private final String plannerId;
     private final Class<? extends Workflow> workflowClass;
     private final String description;
@@ -69,7 +77,8 @@ public class DaprWorkflowPlanner implements Planner {
     private final DaprWorkflowClient workflowClient;
 
     private final BlockingQueue<AgentExchange> agentExchangeQueue = new LinkedBlockingQueue<>();
-    private final AtomicInteger parallelAgents = new AtomicInteger(0);
+    private final ReentrantLock batchLock = new ReentrantLock();
+    private volatile boolean workflowDone = false;
 
     private List<AgentInstance> agents = Collections.emptyList();
     private AgenticScope agenticScope;
@@ -82,9 +91,13 @@ public class DaprWorkflowPlanner implements Planner {
     // Conditional configuration
     private Map<Integer, Predicate<AgenticScope>> conditions = Collections.emptyMap();
 
-    // Tracks pending futures for parallel agent completion
-    private final Deque<CompletableFuture<Void>> pendingFutures = new ArrayDeque<>();
-    private CompletableFuture<Void> lastFuture;
+    // Thread-safe deque for parallel agent futures — nextAction() is called from
+    // different threads (one per agent) in LangChain4j's parallel executor.
+    private final ConcurrentLinkedDeque<CompletableFuture<Void>> pendingFutures = new ConcurrentLinkedDeque<>();
+
+    // Thread-safe deque for per-agent completion info — polled in nextAction()
+    // alongside pendingFutures to signal the orchestration workflow and clean up.
+    private final ConcurrentLinkedDeque<PendingAgentInfo> pendingAgentInfos = new ConcurrentLinkedDeque<>();
 
     public DaprWorkflowPlanner(Class<? extends Workflow> workflowClass, String description,
             AgenticSystemTopology topology, DaprWorkflowClient workflowClient) {
@@ -115,7 +128,8 @@ public class DaprWorkflowPlanner implements Planner {
                 maxIterations,
                 testExitAtLoopEnd);
 
-        workflowClient.scheduleNewWorkflow(workflowClass, input, plannerId);
+        workflowClient.scheduleNewWorkflow(
+                WorkflowNameResolver.resolve(workflowClass), input, plannerId);
         return internalNextAction();
     }
 
@@ -123,11 +137,33 @@ public class DaprWorkflowPlanner implements Planner {
     public Action nextAction(PlanningContext planningContext) {
         // Clear the per-agent Dapr context now that the previous agent has finished.
         DaprAgentContextHolder.clear();
-        // Complete the previous agent's future, unblocking the Dapr activity
-        if (lastFuture != null) {
-            lastFuture.complete(null);
-            lastFuture = pendingFutures.poll();
+        // Complete one future per call. LangChain4j calls nextAction() once per agent
+        // from separate threads in parallel execution.
+        CompletableFuture<Void> future = pendingFutures.poll();
+        if (future != null) {
+            future.complete(null);
         }
+
+        // Signal the orchestration workflow that this agent completed and clean up.
+        PendingAgentInfo info = pendingAgentInfos.poll();
+        if (info != null) {
+            try {
+                // Send "done" to the per-agent AgentRunWorkflow
+                workflowClient.raiseEvent(info.agentRunId(), "agent-event",
+                        new AgentEvent("done", null, null, null));
+                LOG.infof("[Planner:%s] Sent done event to AgentRunWorkflow — agentRunId=%s",
+                        plannerId, info.agentRunId());
+                DaprAgentRunRegistry.unregister(info.agentRunId());
+                // Signal the orchestration workflow that this agent has completed
+                workflowClient.raiseEvent(plannerId, "agent-complete-" + info.agentRunId(), null);
+                LOG.infof("[Planner:%s] Raised agent-complete event — agentRunId=%s",
+                        plannerId, info.agentRunId());
+            } catch (Exception e) {
+                LOG.warnf("[Planner:%s] Failed to signal agent completion for agentRunId=%s: %s",
+                        plannerId, info.agentRunId(), e.getMessage());
+            }
+        }
+
         return internalNextAction();
     }
 
@@ -135,66 +171,86 @@ public class DaprWorkflowPlanner implements Planner {
      * Core synchronization: drains the agent exchange queue and batches
      * agent calls for Langchain4j to execute.
      * <p>
+     * Uses a {@link ReentrantLock} so that exactly one thread blocks on the exchange
+     * queue while other threads (from LangChain4j's parallel executor) return
+     * {@code done()} immediately. LangChain4j's {@code composeActions()} correctly
+     * merges {@code done() + call(batch) → call(batch)} and
+     * {@code done() + done() → done()}, so the composed result is always correct.
+     * <p>
      * For sequential (single-agent) batches, sets {@link DaprAgentContextHolder} so that
      * {@link io.quarkiverse.dapr.langchain4j.agent.DaprToolCallInterceptor} can route any
      * {@code @Tool} calls made by the agent through the corresponding
      * {@link io.quarkiverse.dapr.langchain4j.agent.workflow.AgentRunWorkflow}.
      */
     private Action internalNextAction() {
-        int remaining = parallelAgents.decrementAndGet();
-        if (remaining > 0) {
-            // More parallel agents still being processed by Langchain4j
-            return noOp();
-        }
-
-        // Drain all queued agent exchanges
-        List<AgentExchange> exchanges = new ArrayList<>();
-        try {
-            // Block for the first one
-            AgentExchange first = agentExchangeQueue.take();
-            exchanges.add(first);
-            // Drain any additional ones that arrived
-            agentExchangeQueue.drainTo(exchanges);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            cleanup();
+        if (workflowDone) {
             return done();
         }
 
-        // Check for sentinel (null agent = workflow completed)
-        List<AgentInstance> batch = new ArrayList<>();
-        for (AgentExchange exchange : exchanges) {
-            if (exchange.agent() == null) {
-                // Workflow completed
+        // Only one thread should block waiting for the next batch.
+        // Other threads return done() — LangChain4j's composeActions() ensures
+        // done() + call(batch) → call(batch), so the batch is not lost.
+        if (!batchLock.tryLock()) {
+            return done();
+        }
+
+        try {
+            if (workflowDone) {
+                return done();
+            }
+
+            // Drain all queued agent exchanges
+            List<AgentExchange> exchanges = new ArrayList<>();
+            try {
+                // Block for the first one
+                LOG.debugf("[Planner:%s] Waiting for agent exchanges on queue...", plannerId);
+                AgentExchange first = agentExchangeQueue.take();
+                exchanges.add(first);
+                // Drain any additional ones that arrived
+                agentExchangeQueue.drainTo(exchanges);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                workflowDone = true;
                 cleanup();
                 return done();
             }
-            batch.add(exchange.agent());
+
+            // Check for sentinel (null agent = workflow completed)
+            List<AgentInstance> batch = new ArrayList<>();
+            for (AgentExchange exchange : exchanges) {
+                if (exchange.agent() == null) {
+                    workflowDone = true;
+                    cleanup();
+                    return done();
+                }
+                batch.add(exchange.agent());
+            }
+
+            if (batch.isEmpty()) {
+                workflowDone = true;
+                cleanup();
+                return done();
+            }
+
+            // Store all futures — one per agent. nextAction() is called once per agent
+            // (possibly from different threads), each call polls and completes one future.
+            pendingFutures.clear();
+            pendingAgentInfos.clear();
+            for (AgentExchange exchange : exchanges) {
+                pendingFutures.add(exchange.continuation());
+                pendingAgentInfos.add(new PendingAgentInfo(exchange.agentRunId()));
+            }
+
+            // For sequential execution (single agent), set the Dapr agent context so that
+            // DaprToolCallInterceptor can route @Tool calls through the AgentRunWorkflow.
+            if (exchanges.size() == 1 && exchanges.get(0).agentRunId() != null) {
+                DaprAgentContextHolder.set(exchanges.get(0).agentRunId());
+            }
+
+            return call(batch);
+        } finally {
+            batchLock.unlock();
         }
-
-        if (batch.isEmpty()) {
-            cleanup();
-            return done();
-        }
-
-        // Track parallel count
-        parallelAgents.set(batch.size());
-
-        // Store all futures for the parallel case. nextAction() will be called
-        // once per agent; each call completes one future (FIFO order).
-        pendingFutures.clear();
-        for (AgentExchange exchange : exchanges) {
-            pendingFutures.add(exchange.continuation());
-        }
-        lastFuture = pendingFutures.poll();
-
-        // For sequential execution (single agent), set the Dapr agent context so that
-        // DaprToolCallInterceptor can route @Tool calls through the AgentRunWorkflow.
-        if (exchanges.size() == 1 && exchanges.get(0).agentRunId() != null) {
-            DaprAgentContextHolder.set(exchanges.get(0).agentRunId());
-        }
-
-        return call(batch);
     }
 
     /**
@@ -216,6 +272,7 @@ public class DaprWorkflowPlanner implements Planner {
      * Signals workflow completion by posting a sentinel to the queue.
      */
     public void signalWorkflowComplete() {
+        LOG.infof("[Planner:%s] signalWorkflowComplete() — posting sentinel to queue", plannerId);
         agentExchangeQueue.add(new AgentExchange(null, null, null));
     }
 

@@ -3,6 +3,7 @@ package io.quarkiverse.dapr.langchain4j.agent.workflow;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.quarkiverse.dapr.workflows.WorkflowMetadata;
 import org.jboss.logging.Logger;
 
 import io.dapr.workflows.Workflow;
@@ -38,6 +39,7 @@ import jakarta.enterprise.context.ApplicationScoped;
  * </ol>
  */
 @ApplicationScoped
+@WorkflowMetadata(name = "agent")
 public class AgentRunWorkflow implements Workflow {
 
     private static final Logger LOG = Logger.getLogger(AgentRunWorkflow.class);
@@ -74,7 +76,7 @@ public class AgentRunWorkflow implements Workflow {
                     LOG.infof("[AgentRun:%s] Scheduling ToolCallActivity — tool=%s, args=%s",
                             agentRunId, event.toolName(), event.args());
                     ToolCallOutput toolOutput = ctx.callActivity(
-                            ToolCallActivity.class.getName(),
+                            "tool-call",
                             new ToolCallInput(agentRunId, event.toolCallId(), event.toolName(), event.args()),
                             ToolCallOutput.class).await();
                     toolCallOutputs.add(toolOutput);
@@ -87,7 +89,7 @@ public class AgentRunWorkflow implements Workflow {
                     LOG.infof("[AgentRun:%s] Scheduling LlmCallActivity — method=%s",
                             agentRunId, event.toolName());
                     LlmCallOutput llmOutput = ctx.callActivity(
-                            LlmCallActivity.class.getName(),
+                            "llm-call",
                             new LlmCallInput(agentRunId, event.toolCallId(), event.toolName(), event.args()),
                             LlmCallOutput.class).await();
                     llmCallOutputs.add(llmOutput);

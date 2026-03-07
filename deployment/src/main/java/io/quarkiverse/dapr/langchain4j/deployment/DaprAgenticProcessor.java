@@ -96,6 +96,14 @@ public class DaprAgenticProcessor {
     private static final DotName DAPR_AGENT_INTERCEPTOR_BINDING = DotName.createSimple(
             "io.quarkiverse.dapr.langchain4j.agent.DaprAgentInterceptorBinding");
 
+    /** {@code @WorkflowMetadata} annotation for custom workflow registration names. */
+    private static final DotName WORKFLOW_METADATA_DOTNAME = DotName.createSimple(
+            "io.quarkiverse.dapr.workflows.WorkflowMetadata");
+
+    /** {@code @ActivityMetadata} annotation for custom activity registration names. */
+    private static final DotName ACTIVITY_METADATA_DOTNAME = DotName.createSimple(
+            "io.quarkiverse.dapr.workflows.ActivityMetadata");
+
     private static final String[] WORKFLOW_CLASSES = {
             "io.quarkiverse.dapr.langchain4j.workflow.orchestration.SequentialOrchestrationWorkflow",
             "io.quarkiverse.dapr.langchain4j.workflow.orchestration.ParallelOrchestrationWorkflow",
@@ -141,14 +149,33 @@ public class DaprAgenticProcessor {
         for (String className : WORKFLOW_CLASSES) {
             ClassInfo classInfo = index.getClassByName(DotName.createSimple(className));
             if (classInfo != null) {
-                workflowItems.produce(new WorkflowItemBuildItem(classInfo, WorkflowItemBuildItem.Type.WORKFLOW));
+                String regName = null;
+                String version = null;
+                Boolean isLatest = null;
+                AnnotationInstance meta = classInfo.annotation(WORKFLOW_METADATA_DOTNAME);
+                if (meta != null) {
+                    regName = stringValueOrNull(meta, "name");
+                    version = stringValueOrNull(meta, "version");
+                    AnnotationValue isLatestVal = meta.value("isLatest");
+                    if (isLatestVal != null) {
+                        isLatest = isLatestVal.asBoolean();
+                    }
+                }
+                workflowItems.produce(new WorkflowItemBuildItem(
+                        classInfo, WorkflowItemBuildItem.Type.WORKFLOW, regName, version, isLatest));
             }
         }
 
         for (String className : ACTIVITY_CLASSES) {
             ClassInfo classInfo = index.getClassByName(DotName.createSimple(className));
             if (classInfo != null) {
-                workflowItems.produce(new WorkflowItemBuildItem(classInfo, WorkflowItemBuildItem.Type.WORKFLOW_ACTIVITY));
+                String regName = null;
+                AnnotationInstance meta = classInfo.annotation(ACTIVITY_METADATA_DOTNAME);
+                if (meta != null) {
+                    regName = stringValueOrNull(meta, "name");
+                }
+                workflowItems.produce(new WorkflowItemBuildItem(
+                        classInfo, WorkflowItemBuildItem.Type.WORKFLOW_ACTIVITY, regName, null, null));
             }
         }
     }
@@ -339,16 +366,38 @@ public class DaprAgenticProcessor {
             mc.addException(exType.name().toString());
         }
 
-        // lifecycleManager.getOrActivate(agentName, userMsg, sysMsg)  — before try block
-        ResultHandle lcm = mc.readInstanceField(lcmDesc, mc.getThis());
-        mc.invokeVirtualMethod(
+        // Try to activate the Dapr agent lifecycle. This may fail when running on
+        // threads without a CDI request scope (e.g., LangChain4j's parallel executor).
+        // In that case, fall through to a direct delegate call without Dapr routing.
+        TryBlock activateTry = mc.tryBlock();
+        ResultHandle lcm = activateTry.readInstanceField(lcmDesc, activateTry.getThis());
+        activateTry.invokeVirtualMethod(
                 MethodDescriptor.ofMethod(AgentRunLifecycleManager.class, "getOrActivate",
                         String.class, String.class, String.class, String.class),
                 lcm,
-                mc.load(agentName),
-                userMessage != null ? mc.load(userMessage) : mc.loadNull(),
-                systemMessage != null ? mc.load(systemMessage) : mc.loadNull());
+                activateTry.load(agentName),
+                userMessage != null ? activateTry.load(userMessage) : activateTry.loadNull(),
+                systemMessage != null ? activateTry.load(systemMessage) : activateTry.loadNull());
 
+        // If activation fails (no request scope), delegate directly without Dapr routing.
+        CatchBlockCreator activateCatch = activateTry.addCatch(Throwable.class);
+        {
+            ResultHandle delFallback = activateCatch.readInstanceField(delegateDesc, activateCatch.getThis());
+            ResultHandle[] fallbackParams = new ResultHandle[method.parametersCount()];
+            for (int i = 0; i < fallbackParams.length; i++) {
+                fallbackParams[i] = activateCatch.getMethodParam(i);
+            }
+            if (isVoid) {
+                activateCatch.invokeInterfaceMethod(MethodDescriptor.of(method), delFallback, fallbackParams);
+                activateCatch.returnVoid();
+            } else {
+                ResultHandle fallbackResult = activateCatch.invokeInterfaceMethod(
+                        MethodDescriptor.of(method), delFallback, fallbackParams);
+                activateCatch.returnValue(fallbackResult);
+            }
+        }
+
+        // Activation succeeded — wrap the delegate call with triggerDone() on both paths.
         // try { ... } catch (Throwable t) { ... }
         TryBlock tryBlock = mc.tryBlock();
 
@@ -459,6 +508,19 @@ public class DaprAgenticProcessor {
         }
         // single String stored directly (rare but defensively handled)
         return value.asString();
+    }
+
+    // -------------------------------------------------------------------------
+    // Annotation metadata extraction helpers
+    // -------------------------------------------------------------------------
+
+    private static String stringValueOrNull(AnnotationInstance annotation, String name) {
+        AnnotationValue value = annotation.value(name);
+        if (value == null) {
+            return null;
+        }
+        String s = value.asString();
+        return (s == null || s.isEmpty()) ? null : s;
     }
 
     // -------------------------------------------------------------------------
